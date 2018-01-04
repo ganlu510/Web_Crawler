@@ -1,14 +1,20 @@
 # -*- coding:utf-8 -*-
+
+from lxml import html
+import requests,re,os,threading,time,random
+
+print('''
+#----------------------------------------#
 #   文件：cl1024_pciture.py              #
-#   版本：1.2                            #
+#   版本：1.3                            #
+#   作者：tram-man                       #
 #   邮箱：ganlu510@126.com               #
 #   日期：2017-11-11                     #
 #   环境：Python 3.5                     #
 #   功能：将网站的MM图片分目录存储到本地 #
 #----------------------------------------#
-
-from lxml import html
-import requests,re,os,threading,time,random
+''')
+time.sleep(3)
 
 UA = [
 	'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:47.0) Gecko/20100101 Firefox/47.0',
@@ -34,14 +40,15 @@ num = 1
 
 class download_thread(threading.Thread):
 	'''创建继承于threading.Thread的子类'''
-	def __init__(self,file_name,img_url,img_name):
+	def __init__(self,file_name,img_url,img_name,tid):
 		threading.Thread.__init__(self)
 		self.file_name = file_name
 		self.img_url = img_url
 		self.img_name = img_name
+		self.tid = tid
 	'''把要执行的代码写到run函数里面,线程在创建后会直接调用run函数中的代码块'''
 	def run(self):
-		save_img(self.file_name,self.img_url,self.img_name)
+		save_img(self.file_name,self.img_url,self.img_name,self.tid)
 
 def get_html(url):
 	''' 1.请求页面并判断响应码，如果是非200ok，那么休眠6秒后再重新请求一次
@@ -50,7 +57,7 @@ def get_html(url):
 	try:
 		r = s.get(url=url,headers=header,timeout=12)
 		if r.status_code == 404:
-			print(' %s 响应状态码非200 OK,正在重试中......' % url)
+			print('%s 响应状态码非200 OK,正在重试中......' % url)
 			time.sleep(6)
 			r = s.get(url=url,headers=header,timeout=15)
 		global num
@@ -61,7 +68,7 @@ def get_html(url):
 			try:
 				r = s.get(url=url,headers=header,timeout=15)
 				if r.status_code == 404:
-					print(' %s 响应状态码非200 OK,正在重试中......' % url)
+					print('%s 响应状态码非200 OK,正在重试中......' % url)
 					time.sleep(6)
 					r = s.get(url=url,headers=header,timeout=15)
 			except Exception as err:
@@ -70,7 +77,7 @@ def get_html(url):
 			else:
 				r.encoding = 'GB18030'
 				if r.text.find('404 Not Found') != -1:
-					print(' %s 重试失败！放弃访问！' % url,r)
+					print('%s 重试失败！放弃访问！' % url,r)
 					return r.text
 				else:
 					print('请求重试 %s 成功！' % ('【'+str(num)+'】'+ url),r)
@@ -79,10 +86,10 @@ def get_html(url):
 	else:
 		r.encoding = 'GB18030'
 		if r.text.find('404 Not Found') != -1:
-			print(' %s 重试失败！放弃访问！' % url,r)
+			print('%s 重试失败！放弃访问！' % url,r)
 			return r.text
 		else:
-			print(' %s 访问成功！' % ('【'+str(num)+'】'+ url),r)
+			print('%s 访问成功！' % ('【'+str(num)+'】'+ url),r)
 			num += 1
 			return r.text
 
@@ -123,36 +130,36 @@ def get_page_html(url):
 			try:
 				os.makedirs('D:\\Download\\Pictrue\\' + file_name)
 				os.chdir('D:\\Download\\Pictrue\\' + file_name)
-				print('D:\Download\Pictrue\%s 主题目录创建成功！' % file_name)
+				print('D:\Download\Pictrue\%s 主题帖子目录创建成功！' % file_name)
 			except Exception as err:
-				print('主题目录创建失败！','\n'+err)
+				print('主题帖子目录创建失败！','\n'+err)
 				continue
 		else:
-			print('D:\Download\Pictrue\%s 主题目录已存在！' % file_name)
-		for img_url in img_url_list:
+			print('D:\Download\Pictrue\%s 主题帖子目录已存在！' % file_name)
+		for img_url,tid in zip(img_url_list,range(len(img_url_list))):
 			img_name = img_url.split('/')[-1].translate(str.maketrans('<>?=&','____.'))
 			if not os.path.isfile('D:\\Download\\Pictrue\\' + file_name+ '\\' + img_name):
-				thread = download_thread(file_name,img_url,img_name)
+				thread = download_thread(file_name,img_url,img_name,tid)
 				thread.start()
-				time.sleep(1.5)
+				time.sleep(1.6)
 			else:
 				print(img_name+' >>> 该图片已经下载过了！')
-		print('该主题共有 %s 张图片!' % len(img_url_list))
+		print('该主题帖子共有 %s 张图片!' % len(img_url_list))
 		time.sleep(5)
 
-def save_img(file_name,img_url,img_name):
+def save_img(file_name,img_url,img_name,tid):
 	'''图片下载处理，如果图片url请求失败会重新请求一次'''
 	with open('D:\\Download\\Pictrue\\' + file_name + '\\' + img_name,'wb') as file:
-		print('正在使用线程 %s 下载：' % threading.current_thread().name + file_name +' >>> '+ img_name)
+		print('正在使用线程 Thread-%s 下载：' % tid + file_name +' >>> '+ img_name)
 		try:
 			file.write(s.get(img_url,headers=header,timeout=15).content)
-			print('线程 %s 下载完成！' % threading.current_thread().name)
+			print('线程 Thread-%s 下载完成！' % tid)
 		except Exception as err:
 			print(err,'\n'+img_url+' >>> URL请求失败,正在重新下载......')
 			time.sleep(3)
 			try:
 				file.write(s.get(img_url,headers=header,timeout=18).content)
-				print('线程 %s 重新下载完成！' % threading.current_thread().name)
+				print('线程 Thread-%s 重新下载完成！' % tid)
 			except Exception as err:
 				print(err,'\n'+img_url+' >>> URL请求继续失败,放弃下载......')
 
